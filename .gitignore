@@ -1,0 +1,85 @@
+# ========== Unity Specific ==========
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Ll]ibrary
+MemoryCaptures/
+.utmp
+*_BurstDebugInformation_DoNotShip
+*.blob
+Samples
+
+# ========== Unity Asset Meta Data ==========
+*.pidb
+*.suo
+*.user
+*.userprefs
+*.unityproj
+*.csproj
+*.vbproj
+*.sln
+*.svd
+*.tmp
+*.bak
+*.swp
+*.lock
+*.gid
+*.pbxproj
+*.pidb
+*.booproj
+*.pidb.meta
+
+# ========== Unity Cache and Generated Files ==========
+*.asset
+*.tinfo
+*.apk
+*.aab
+*.ipa
+*.unitypackage
+*.dmg
+*.app
+
+# ========== Unity Plugin Folders ==========
+/Packages/com.unity.package-manager-do-not-modify/
+/Packages/com.unity.render-pipelines.core/
+*.pdb
+*.ilk
+*.ipch
+
+# ========== Logs and Crash Reports ==========
+*.log
+*.dmp
+*.stacktrace
+
+# ========== Local Unity Config ==========
+.vs/
+.vscode/
+.idea/
+*.iml
+
+# ========== Rider and JetBrains ==========
+/.idea/
+/*.sln.DotSettings.user
+
+# ========== MacOS and System Files ==========
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+*.x86_64
+*.debug
+*.so
+*.so.0
+*_Data
+
+# ========== Android debug infor =========
+*.symbols.zip
+
+# ===== ignore samples ===
+*VR_BurstDebugInformation_DoNotShip
+
+Android_BackUpThisFolder_ButDontShipItWithYourGame/
+
