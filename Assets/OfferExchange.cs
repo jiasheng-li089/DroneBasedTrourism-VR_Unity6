@@ -8,44 +8,6 @@ using System.Collections.Generic;
 using System.Collections;
 using Newtonsoft.Json;
 
-
-[Serializable]
-public class IceServer
-{
-    public string uri;
-}
-
-[Serializable]
-public class CreateWhepEndPointReq
-{
-    public string id;
-
-    // the mountpoint must be same as the streaming room id configured in the janus streaming configuration file
-    public int mountpoint = 1;
-
-    public IceServer[] iceServers;
-}
-
-[Serializable]
-public class CreateWhipEndPointReq
-{
-    public string id;
-    // INFO the room number must be same as the video room number configured in the janus video room configuration file
-    public int room = 1235;
-
-    public string secret = "adminpwd";
-
-    public RecipientForWhipEndPoint recipient = new RecipientForWhipEndPoint();
-}
-
-[Serializable]
-public class RecipientForWhipEndPoint
-{
-    public string host = "127.0.0.1";
-
-    public int dataPort = 5006;
-}
-
 public class SimpleJanusResp
 {
     public string janus;
@@ -656,7 +618,7 @@ public class VideoRoomOfferExchanger : IOfferExchanger
         // check if the result is correct
         if (null == result.Result)
         {
-            var exception = null == result.Exception ? new Exception("Empty response") : result.Exception;
+            var exception = result.Exception ?? new Exception("Empty response");
             handleError("Unable to join the video room as the data publisher", exception);
             yield break;
         }
@@ -705,7 +667,7 @@ public class VideoRoomOfferExchanger : IOfferExchanger
         // check if the result is correct
         if (null == result.Result)
         {
-            var exception = null == result.Exception ? new Exception("Empty response") : result.Exception;
+            var exception = result.Exception ?? new Exception("Empty response");
             handleError("Failed to request server to forward data", exception);
             yield break;
         }
@@ -714,7 +676,7 @@ public class VideoRoomOfferExchanger : IOfferExchanger
 
         _HandleIfVideoPublisherIsOnline(resp?.plugindata?.data);
 
-        action?.Invoke(new() { Result = resp.jsep.sdp });
+        action?.Invoke(new() { Result = resp?.jsep.sdp });
     }
 
     public virtual IEnumerator FetchRemoteOffer(object data, Action<TaskResult<string>> action)
@@ -731,7 +693,7 @@ public class VideoRoomOfferExchanger : IOfferExchanger
         {
             task = Task.Run(async () => await _MakeSureWebSocket());
 
-            yield return new WaitUntil(() => null != _webSocket && _webSocket.State == WebSocketState.Open);
+            yield return new WaitUntil(() => _webSocket is { State: WebSocketState.Open });
         }
 
         // make sure the session id and handle id
