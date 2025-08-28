@@ -1,5 +1,8 @@
 using System;
 using UnityEngine;
+using UnityEngine.InputSystem;
+using UnityEngine.XR.Interaction.Toolkit.Inputs.Readers;
+using UnityEngine.XR.Interaction.Toolkit.Interactors;
 
 public class DetectCameraMovement : MonoBehaviour
 {
@@ -12,6 +15,10 @@ public class DetectCameraMovement : MonoBehaviour
 
     private long captureInterval = 200L;
 
+    [SerializeField]
+    public XRInputValueReader<Vector2> m_LeftThumbStickReader = new XRInputValueReader<Vector2>("Thumbstick");
+    [SerializeField]
+    public XRInputValueReader<Vector2> m_RightThumbStickReader = new XRInputValueReader<Vector2>("Thumbstick");
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
@@ -41,6 +48,14 @@ public class DetectCameraMovement : MonoBehaviour
         {
             lastSampleTime = currentTimestamp;
             // webRTCManager.Send("Ping " + currentTimestamp, "data");
+        }
+
+        Vector2 leftInput = m_LeftThumbStickReader.ReadValue();
+        Vector2 rightInput = m_RightThumbStickReader.ReadValue();
+
+        if (leftInput != Vector2.zero || rightInput != Vector2.zero)
+        {
+            Debug.Log($"Left input: ({leftInput.x}, {leftInput.y})\t\tRight input: ({rightInput.x}, {rightInput.y})");
         }
     }
 
