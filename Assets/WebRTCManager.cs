@@ -80,7 +80,7 @@ public abstract class BaseWebRtcConnection
         return configuration;
     }
 
-    private void initializeDataChannel(RTCDataChannel channel)
+    private void InitializeDataChannel(RTCDataChannel channel)
     {
         Debug.Log("DataChannel received");
         _channel = channel;
@@ -94,6 +94,9 @@ public abstract class BaseWebRtcConnection
             {
                 Debug.Log($"Received message from ({_identity}) {channel.Label} : {msg}");
             }
+            
+            if (!NotifyReceivedData()) return;  // nobody care about data received through this connection
+            
             EventManager.Instance.Notify(EventManager.CHANNEL_MSG,
                 new WebRtcEvent(_identity, new MsgFromChannel
                 {
@@ -174,7 +177,7 @@ public abstract class BaseWebRtcConnection
 
             _connection.OnDataChannel = (channel) =>
             {
-                initializeDataChannel(channel);
+                InitializeDataChannel(channel);
             };
         }
 
@@ -208,6 +211,8 @@ public abstract class BaseWebRtcConnection
     }
 
     public abstract IEnumerator Connect();
+
+    protected abstract bool NotifyReceivedData();
 }
 
 public class PublicationConnection : BaseWebRtcConnection
@@ -217,6 +222,11 @@ public class PublicationConnection : BaseWebRtcConnection
         ITaskExecutor executor) : base(identity, supportedTypes, offerExchanger,
         executor)
     {
+    }
+
+    protected override bool NotifyReceivedData()
+    {
+        return false;
     }
 
     public override IEnumerator Connect()
@@ -285,13 +295,22 @@ public class PublicationConnection : BaseWebRtcConnection
 
 public class SubscriptionConnection : BaseWebRtcConnection
 {
-    private object _data;
+    private readonly object _data;
+
+    private readonly bool _notifyData;
+    
     public SubscriptionConnection(string identity,
         HashSet<string> supportedTypes, IOfferExchanger offerExchanger,
         ITaskExecutor executor, object data) : base(identity, supportedTypes, offerExchanger,
         executor)
     {
         _data = data;
+        _notifyData = _supportedTypes.Contains(TYPE_DATA);
+    }
+
+    protected override bool NotifyReceivedData()
+    {
+        return _notifyData;
     }
 
     public override IEnumerator Connect()
@@ -370,7 +389,7 @@ public class SubscriptionConnection : BaseWebRtcConnection
     }
 }
 
-public class WebRTCManager : MonoBehaviour, ITaskExecutor, IOnEventListener
+public class WebRtcManager : MonoBehaviour, ITaskExecutor, IOnEventListener
 {
 
     public const string VIDEO_RECEIVER = "videoReceiver";
@@ -379,9 +398,9 @@ public class WebRTCManager : MonoBehaviour, ITaskExecutor, IOnEventListener
 
     public const string DATA_SENDER = "dataSender";
 
-    private Dictionary<string, BaseWebRtcConnection> _connections = new();
+    private readonly Dictionary<string, BaseWebRtcConnection> _connections = new();
 
-    private Queue<Action> _mainThreadQueue = new();
+    private readonly Queue<Action> _mainThreadQueue = new();
 
     private IOfferExchanger _videoRoomOfferExchanger;
 
@@ -406,37 +425,44 @@ public class WebRTCManager : MonoBehaviour, ITaskExecutor, IOnEventListener
     // Start is called before the first frame update
     void Start()
     {
-        _videoRoomOfferExchanger = new VideoRoomOfferExchanger((e, data) =>
+        BaseWebRtcConnection connection;
+        
+        // INFO when only subscribing the video stream, do not build the connection for data subscription and publication
+        if (!ConfigManager.ONLY_VIDEO)
         {
-            if (VideoRoomOfferExchanger.EVENT_VIDEO_PUBLISHER_OFFLINE == e)
+            _videoRoomOfferExchanger = new VideoRoomOfferExchanger((e, data) =>
             {
-                if (_connections.ContainsKey(DATA_RECEIVER))
+                if (VideoRoomOfferExchanger.EVENT_VIDEO_PUBLISHER_OFFLINE == e)
                 {
-                    _connections[DATA_RECEIVER]?.Disconnect();
-                    _connections.Remove(DATA_RECEIVER);
-                    _videoRoomOfferExchanger?.StopSubscribing();
+                    if (_connections.ContainsKey(DATA_RECEIVER))
+                    {
+                        _connections[DATA_RECEIVER]?.Disconnect();
+                        _connections.Remove(DATA_RECEIVER);
+                        _videoRoomOfferExchanger?.StopSubscribing();
+                    }
                 }
-            }
-            else
-            {
-                // online
-                var whepSupportTypes = new HashSet<string>
+                else
                 {
-                    BaseWebRtcConnection.TYPE_DATA,
-                };
-                var connection = new SubscriptionConnection(DATA_RECEIVER, whepSupportTypes, _videoRoomOfferExchanger, this, data);
-                _connections.Add(DATA_RECEIVER, connection);
-                Execute(() => StartCoroutine(connection.Connect()));
-            }
-        });
-
-        var whipSupportTypes = new HashSet<string>
-        {
-            BaseWebRtcConnection.TYPE_DATA,
-        };
-        BaseWebRtcConnection connection = new PublicationConnection(DATA_SENDER, whipSupportTypes, _videoRoomOfferExchanger, this);
-        _connections.Add(DATA_SENDER, connection);
-
+                    // online
+                    var whepSupportTypes = new HashSet<string>
+                    {
+                        BaseWebRtcConnection.TYPE_DATA,
+                    };
+                    var dataReceiverConnection = new SubscriptionConnection(DATA_RECEIVER, whepSupportTypes, _videoRoomOfferExchanger, this, data);
+                    _connections.Add(DATA_RECEIVER, dataReceiverConnection);
+                    Execute(() => StartCoroutine(dataReceiverConnection.Connect()));
+                }
+            });
+            // only send data back to the other end while running on Oculus
+            var whipSupportTypes = new HashSet<string>
+            {
+                BaseWebRtcConnection.TYPE_DATA,
+            };
+            connection =
+                new PublicationConnection(DATA_SENDER, whipSupportTypes, _videoRoomOfferExchanger, this);
+            _connections.Add(DATA_SENDER, connection);
+        }
+        
         _streamingOfferExchanger = new StreamingOfferExchanger();
         connection = new SubscriptionConnection(VIDEO_RECEIVER, new HashSet<string>
         {
@@ -445,6 +471,7 @@ public class WebRTCManager : MonoBehaviour, ITaskExecutor, IOnEventListener
         }, _streamingOfferExchanger, this, null);
         _connections.Add(VIDEO_RECEIVER, connection);
 
+        // INFO for debugging, show detail logs of webrtc, the log is quite chattering
         // WebRTC.ConfigureNativeLogging(true, NativeLoggingSeverity.Error);
         StartCoroutine(WebRTC.Update());
         foreach (var conn in _connections)
@@ -493,14 +520,13 @@ public class WebRTCManager : MonoBehaviour, ITaskExecutor, IOnEventListener
     // Update is called once per frame
     void Update()
     {
-        while (_mainThreadQueue.Count > 0)
+        lock (_mainThreadQueue)
         {
-            Action action;
-            lock (_mainThreadQueue)
+            while (_mainThreadQueue.Count > 0)
             {
-                action = _mainThreadQueue.Dequeue();
+                Action action = _mainThreadQueue.Dequeue();
+                action?.Invoke();
             }
-            action?.Invoke();
         }
     }
 

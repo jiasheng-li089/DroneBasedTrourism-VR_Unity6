@@ -18,40 +18,42 @@ public class EventManager : MonoBehaviour
     public const string CHANNEL_MSG = "channel_msg";
 
     public const string DISCONNECTION = "disconnection";
+    
+    public const string GUIDE_INFO = "guide_info";
 
     public static EventManager Instance { get; private set; }
 
-    private readonly Dictionary<string, List<IOnEventListener>> eventAndAction = new();
+    private readonly Dictionary<string, List<IOnEventListener>> _eventAndAction = new();
 
     public void Observe(string key, IOnEventListener callback) 
     {
         List<IOnEventListener> action;
-        if (eventAndAction.ContainsKey(key))
+        if (_eventAndAction.ContainsKey(key))
         {
-            action = eventAndAction[key];
+            action = _eventAndAction[key];
         }
         else
         {
             action = new List<IOnEventListener>();
-            eventAndAction.TryAdd(key, action);
+            _eventAndAction.TryAdd(key, action);
         }
         action.Add(callback);
     }
 
     public void UnObserve(string key, IOnEventListener callback)
     {
-        if (!eventAndAction.ContainsKey(key))
+        if (!_eventAndAction.ContainsKey(key))
         {
             return;
         }
-        var actions = eventAndAction[key];
+        var actions = _eventAndAction[key];
         actions.Remove(callback);
     }
 
     public void Notify(string key, object result)
     {
-        if (eventAndAction.ContainsKey(key)) {
-            var actions = eventAndAction[key];
+        if (_eventAndAction.ContainsKey(key)) {
+            var actions = _eventAndAction[key];
             foreach(var action in actions)
             {
                 action.OnEvent(key, result);

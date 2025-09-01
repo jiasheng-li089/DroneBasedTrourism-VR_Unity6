@@ -5,7 +5,7 @@ using Unity.WebRTC;
 using System.Collections.Generic;
 using UnityEngine.UI;
 
-public class InformationPanelRender : MonoBehaviour, IOnEventListener
+public class DebugInformationRender : MonoBehaviour, IOnEventListener
 {
     private Text _videoLatency;
     private Text _renderingFrequency;
@@ -23,14 +23,19 @@ public class InformationPanelRender : MonoBehaviour, IOnEventListener
 
     private long _lastTrackTimestamp = 0L;
 
-    private long REFRESH_INTERVAL = 2000L;
+    private const long REFRESH_INTERVAL = 1000L;
 
-    private WebRTCManager _webRTCManager;
+    private WebRtcManager _webRtcManager;
+
+    private void Awake()
+    {
+        gameObject.SetActive(ConfigManager.DEBUG);
+    }
 
     // Start is called before the first frame update
     void Start()
     {
-        _webRTCManager = GetComponentInParent<WebRTCManager>();
+        _webRtcManager = GetComponentInParent<WebRtcManager>();
 
         _videoLatency = transform.Find("video_latency").GetComponent<Text>();
         _dataLatency = transform.Find("data_latency").GetComponent<Text>();
@@ -98,7 +103,7 @@ public class InformationPanelRender : MonoBehaviour, IOnEventListener
         {
             WebRtcEvent webRtcEvent = msg as WebRtcEvent;
             MsgFromChannel message = webRtcEvent.data as MsgFromChannel;
-            if (webRtcEvent.identity == WebRTCManager.DATA_RECEIVER)
+            if (webRtcEvent.identity == WebRtcManager.DATA_RECEIVER)
             {
                 SerializableMessage serializableMessage = message.deserializedMsg;
                 if ("Pong" == serializableMessage.type)
@@ -117,7 +122,7 @@ public class InformationPanelRender : MonoBehaviour, IOnEventListener
 
     private void SendPingToTestDataLatency()
     {
-        _webRTCManager.Send($"{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}", "Ping");
+        _webRtcManager.Send($"{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}", "Ping");
     }
 
     private Action<IDictionary<string, RTCStats>> _reportCallBack = null;
@@ -139,6 +144,6 @@ public class InformationPanelRender : MonoBehaviour, IOnEventListener
             };
         }
 
-        _webRTCManager.GetConnectionStats(_reportCallBack);
+        _webRtcManager.GetConnectionStats(_reportCallBack);
     }
 }

@@ -14,7 +14,7 @@ public class ApplyVideoTexture : MonoBehaviour, IOnEventListener
     {
         WebRtcEvent webRtcEvent = (WebRtcEvent) con;
         RTCPeerConnection connection = (RTCPeerConnection)webRtcEvent.data;
-        if (WebRTCManager.VIDEO_RECEIVER != webRtcEvent.identity)
+        if (WebRtcManager.VIDEO_RECEIVER != webRtcEvent.identity)
         {
             return;
         }
