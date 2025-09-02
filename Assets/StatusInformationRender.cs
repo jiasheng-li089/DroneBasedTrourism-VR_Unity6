@@ -18,15 +18,9 @@ public class StatusInformationRender : MonoBehaviour, IOnEventListener
 
     void Start()
     {
+        statusText = transform.Find("status").GetComponent<Text>();
         EventManager.Instance.Observe(EventManager.GUIDE_INFO, this);
     }
-
-    // Update is called once per frame
-    void Update()
-    {
-        
-    }
-    
 
     private void OnDestroy()
     {

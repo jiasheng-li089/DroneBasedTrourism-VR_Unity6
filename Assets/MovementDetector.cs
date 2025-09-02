@@ -1,17 +1,13 @@
 using System;
+using System.Collections.Generic;
+using Newtonsoft.Json;
 using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit.Inputs.Readers;
+using Object = System.Object;
 
 public class OperationDetector : MonoBehaviour, IOnEventListener
 {
-    private Vector3 lastPosition;
-    private Vector3 initialRoation;
-
-    private WebRtcManager webRTCManager;
-
-    private long lastSampleTime = 0;
-
-    private long captureInterval = 200L;
+    private long captureInterval = 50L;
 
     [SerializeField]
     public XRInputValueReader<Vector2> m_LeftThumbStickReader = new XRInputValueReader<Vector2>("Thumbstick");
@@ -30,45 +26,11 @@ public class OperationDetector : MonoBehaviour, IOnEventListener
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
-        lastPosition = transform.position;
-        initialRoation = transform.rotation.eulerAngles;
+        var lastPosition = transform.position;
+        var initialRoation = transform.rotation.eulerAngles;
 
         Debug.Log("Initial Position: " + lastPosition + ", Initial Rotation: " + initialRoation);
-        webRTCManager = GetComponentInParent<WebRtcManager>();
-        _schedulableAction = new MovementDetectorAction(this, 100);
-
         EventManager.Instance.Observe(EventManager.CHANNEL_MSG, this);
-    }
-
-    // Update is called once per frame
-    void Update()
-    {
-        Vector3 currentPosition = transform.position;
-        Vector3 currentRotation = transform.rotation.eulerAngles;
-
-        // Debug.Log("Current Position: " + currentPosition + ", Current Rotation: " + currentRotation);
-
-        // TODO: calculate the difference between the last and current position and rotation,
-        // generate commands to control the drone based on the difference,
-        // and send the commands to the drone
-        if (null == webRTCManager) return;
-
-        long currentTimestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-        if (currentTimestamp - lastSampleTime >= captureInterval)
-        {
-            lastSampleTime = currentTimestamp;
-            // webRTCManager.Send("Ping " + currentTimestamp, "data");
-        }
-
-        Vector2 leftInput = m_LeftThumbStickReader.ReadValue();
-        Vector2 rightInput = m_RightThumbStickReader.ReadValue();
-
-        // limit the frequency to read the data
-
-        if (leftInput != Vector2.zero || rightInput != Vector2.zero)
-        {
-            Debug.Log($"Left input: ({leftInput.x}, {leftInput.y})\t\tRight input: ({rightInput.x}, {rightInput.y})");
-        }
     }
 
     private void OnDestroy()
@@ -81,7 +43,7 @@ public class OperationDetector : MonoBehaviour, IOnEventListener
     {
         if (EventManager.CHANNEL_MSG != ev) return;
 
-        SerializableMessage msg = (arg as MsgFromChannel)?.deserializedMsg;
+        SerializableMessage msg = ((arg as WebRtcEvent)?.data as MsgFromChannel)?.deserializedMsg;
 
         if (null == msg || "Control" != msg.type) return;
 
@@ -96,10 +58,14 @@ public class OperationDetector : MonoBehaviour, IOnEventListener
             _schedulableAction = new SimpleDelayAction<OperationDetector>(this, 1000L, () =>
             {
                 EventManager.Instance.Notify(EventManager.GUIDE_INFO, "Go");
-                _schedulableAction?.Stop();
 
-                _schedulableAction = new MovementDetectorAction(this, 100);
-                StartCoroutine(_schedulableAction.Start());
+                var tmp = new MovementDetectorAction(this, 100);
+                if (!_schedulableAction.IsFinished())
+                {
+                    StartCoroutine(tmp.Start());
+                    _schedulableAction?.Stop();
+                    _schedulableAction = tmp;
+                }
             });
             StartCoroutine(_schedulableAction.Start());
         }
@@ -112,13 +78,106 @@ public class OperationDetector : MonoBehaviour, IOnEventListener
     }
 }
 
+class ControlStatusData
+{
+    private Vector3 benchmarkPosition;
+    private Vector3 benchmarkRotation;
+
+    private Vector3 lastPosition;
+    private Vector3 lastRotation;
+
+    private Vector3 currentPosition;
+    private Vector3 currentRotation;
+
+    private Vector2 leftThumbStickValue;
+    private Vector2 rightThumbStickValue;
+
+    private long lastSampleTime = 0;
+
+    public ControlStatusData(Vector3 benchmarkPosition, Vector3 benchmarkRotation)
+    {
+        this.benchmarkPosition = benchmarkPosition;
+        this.benchmarkRotation = benchmarkRotation;
+
+        currentPosition = lastPosition = benchmarkPosition;
+        currentRotation = lastRotation = benchmarkRotation;
+    }
+
+    public void UpdateLocationAndRotation(Vector3 position, Vector3 rotation)
+    {
+        lastPosition = currentPosition;
+        lastRotation = currentRotation;
+
+        currentPosition = position;
+        currentRotation = rotation;
+
+        lastSampleTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+    }
+
+    public void UpdateThumbStickValues(Vector2 leftThumbStickValue, Vector2 rightThumbStickValue)
+    {
+        this.leftThumbStickValue = leftThumbStickValue;
+        this.rightThumbStickValue = rightThumbStickValue;
+
+        lastSampleTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+    }
+
+    private Object VectorToDict(Object vector)
+    {
+        if (vector is Vector3 tmp)
+        {
+            return new Dictionary<string, object>
+            {
+                {
+                    "x", tmp.x
+                },
+                {
+                    "y", tmp.y
+                },
+                {
+                    "z", tmp.z
+                }
+            };
+        }
+        else if (vector is Vector2 t)
+        {
+            return new Dictionary<string, object>
+            {
+                {
+                    "x", t.x
+                },
+                {
+                    "y", t.y
+                }
+            };
+        }
+
+        return null;
+    }
+
+    public Object ToDictionary()
+    {
+        return new Dictionary<string, object>
+        {
+            {"benchmarkPosition", VectorToDict(benchmarkPosition)},
+            {"benchmarkRotation", VectorToDict(benchmarkRotation)},
+            {"lastPosition", VectorToDict(lastPosition)},
+            {"lastRotation", VectorToDict(lastRotation)},
+            {"currentPosition", VectorToDict(currentPosition)},
+            {"currentRotation", VectorToDict(currentRotation)},
+            {"lastSampleTime", lastSampleTime},
+            {"leftThumbStickValue", VectorToDict(leftThumbStickValue)},
+            {"rightThumbStickValue", VectorToDict(rightThumbStickValue)}
+        };
+    }
+}
+
 class MovementDetectorAction : PeriodicalAction<OperationDetector>
 {
     private readonly WebRtcManager _webRtcManager;
 
-    private Vector3? _lastPosition = null;
-    private Vector3? _lastRotation = null;
-    
+    private ControlStatusData _statusData;
+
     public MovementDetectorAction(OperationDetector host, long interval) : base(host, interval)
     {
         _webRtcManager = host.GetComponentInParent<WebRtcManager>();
@@ -126,23 +185,22 @@ class MovementDetectorAction : PeriodicalAction<OperationDetector>
 
     private void InitializeBenchmark()
     {
-        _lastPosition = Host.gameObject.transform.position;
-        _lastRotation = Host.gameObject.transform.rotation.eulerAngles;
+        // TODO right here, show I use the position or localPosition???
+        _statusData = new ControlStatusData(Host.gameObject.transform.position, Host.gameObject.transform.eulerAngles);
     }
 
     public override void OnAction()
     {
-        if (null == _lastPosition)
+        if (null == _statusData)
         {
             InitializeBenchmark();
-            
-            // initialize the benchmark
         }
-        
-        // read left thumb stick
-        Vector2 leftThumbStickValue = Host.m_LeftThumbStickReader.ReadValue();
-        Vector2 rightThumbStickValue = Host.m_RightThumbStickReader.ReadValue();
-        
-        _webRtcManager.Send("", "ControlStatus");
+
+        _statusData.UpdateLocationAndRotation(Host.gameObject.transform.position,
+            Host.gameObject.transform.eulerAngles);
+        _statusData.UpdateThumbStickValues(Host.m_LeftThumbStickReader.ReadValue(),
+            Host.m_RightThumbStickReader.ReadValue());
+
+        _webRtcManager.Send(JsonConvert.SerializeObject(_statusData.ToDictionary()), "ControlStatus");
     }
 }

@@ -56,9 +56,9 @@ public abstract class BaseWebRtcConnection
     public const string TYPE_AUDIO = "audio";
     public const string TYPE_DATA = "data";
 
-    private const bool DEBUG_DATA_CHANNEL = true;
+    private const bool DEBUG_DATA_CHANNEL = false;
 
-    private const string iceServerUrl = "stun:stun.l.google.com:1930";
+    private const string ICE_SERVER_URL = "stun:stun.l.google.com:1930";
 
     protected string _identity;
     protected HashSet<string> _supportedTypes;
@@ -75,7 +75,7 @@ public abstract class BaseWebRtcConnection
         RTCConfiguration configuration = default;
         configuration.iceServers = new RTCIceServer[]
         {
-            new() { urls = new string[] { iceServerUrl }}
+            new() { urls = new string[] { ICE_SERVER_URL }}
         };
         return configuration;
     }
@@ -488,8 +488,14 @@ public class WebRtcManager : MonoBehaviour, ITaskExecutor, IOnEventListener
 
 
         var channel = "HeadsetPosFeedBack";
-        _connections[DATA_SENDER]?.Send(
-            $"{{\"data\": \"{data}\", \"channel\": \"{channel}\", \"type\": \"{type}\", \"from\": \"Headset\"}}");
+        var sendingDict = new Dictionary<string, object>
+        {
+            { "data", data },
+            { "type", type },
+            { "channel", channel },
+            { "from", "Headset" }
+        };
+        _connections[DATA_SENDER]?.Send(JsonConvert.SerializeObject(sendingDict));
     }
 
     public void GetConnectionStats(Action<IDictionary<string, RTCStats>> callback)

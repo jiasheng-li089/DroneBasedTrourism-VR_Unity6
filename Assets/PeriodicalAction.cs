@@ -9,6 +9,8 @@ public interface ISchedulableAction<T>
     void Stop();
 
     public void OnAction();
+
+    public bool IsFinished();
 }
 
 public abstract class SchedulableAction<T> : ISchedulableAction<T>
@@ -30,6 +32,11 @@ public abstract class SchedulableAction<T> : ISchedulableAction<T>
     public void Stop()
     {
         IsRunning = false;
+    }
+
+    public bool IsFinished()
+    {
+        return !IsRunning;
     }
 
     public abstract void OnAction();

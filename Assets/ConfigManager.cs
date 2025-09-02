@@ -3,9 +3,9 @@ using UnityEngine;
 
 public static class ConfigManager
 {
-    public const bool DEBUG = false;
+    public const bool DEBUG = true;
 
-    public const bool ONLY_VIDEO = true;
+    public const bool ONLY_VIDEO = false;
     
     public static bool IsRunningOnOculus()
     {
