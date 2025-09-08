@@ -7,7 +7,7 @@ using Object = System.Object;
 
 public class OperationDetector : MonoBehaviour, IOnEventListener
 {
-    private long captureInterval = 50L;
+
 
     [SerializeField]
     public XRInputValueReader<Vector2> m_LeftThumbStickReader = new XRInputValueReader<Vector2>("Thumbstick");
@@ -16,6 +16,8 @@ public class OperationDetector : MonoBehaviour, IOnEventListener
     public XRInputValueReader<Vector2> m_RightThumbStickReader = new XRInputValueReader<Vector2>("Thumbstick");
 
     private ISchedulableAction<OperationDetector> _schedulableAction;
+
+    private ISchedulableAction<OperationDetector> _uiAction = null;
 
     private void Awake()
     {
@@ -27,10 +29,15 @@ public class OperationDetector : MonoBehaviour, IOnEventListener
     void Start()
     {
         var lastPosition = transform.position;
-        var initialRoation = transform.rotation.eulerAngles;
+        var initialRotation = transform.rotation.eulerAngles;
 
-        Debug.Log("Initial Position: " + lastPosition + ", Initial Rotation: " + initialRoation);
+        Debug.Log("Initial Position: " + lastPosition + ", Initial Rotation: " + initialRotation);
         EventManager.Instance.Observe(EventManager.CHANNEL_MSG, this);
+    }
+
+    private void Update()
+    {
+        _uiAction?.OnAction();
     }
 
     private void OnDestroy()
@@ -55,16 +62,25 @@ public class OperationDetector : MonoBehaviour, IOnEventListener
                 "Get ready. Please stay still and don't move the thumb sticks on the controllers");
             _schedulableAction?.Stop();
 
-            _schedulableAction = new SimpleDelayAction<OperationDetector>(this, 1000L, () =>
+            _schedulableAction = new SimpleDelayAction<OperationDetector>(this, ConfigManager.PERIOD_FOR_USER_TO_PREPARE, () =>
             {
                 EventManager.Instance.Notify(EventManager.GUIDE_INFO, "Go");
 
-                var tmp = new MovementDetectorAction(this, 100);
+                var tmp = new MovementDetectorAction(this, ConfigManager.SAMPLING_INTERVAL_IN_MILLISECONDS);
                 if (!_schedulableAction.IsFinished())
                 {
-                    StartCoroutine(tmp.Start());
-                    _schedulableAction?.Stop();
-                    _schedulableAction = tmp;
+                    if (ConfigManager.SAMPLE_IN_COROUTINE)
+                    {
+                        StartCoroutine(tmp.Start());
+                        _schedulableAction?.Stop();
+                        _schedulableAction = tmp;
+                    }
+                    else
+                    {
+                        _uiAction = tmp;
+                        _schedulableAction?.Stop();
+                        _schedulableAction = null;
+                    }
                 }
             });
             StartCoroutine(_schedulableAction.Start());
@@ -73,6 +89,10 @@ public class OperationDetector : MonoBehaviour, IOnEventListener
         {
             _schedulableAction?.Stop();
             _schedulableAction = null;
+            
+            _uiAction?.Stop();
+            _uiAction = null;
+            
             EventManager.Instance.Notify(EventManager.GUIDE_INFO, "Control abort");
         }
     }
@@ -92,7 +112,7 @@ class ControlStatusData
     private Vector2 leftThumbStickValue;
     private Vector2 rightThumbStickValue;
 
-    private long lastSampleTime = 0;
+    private long sampleTimestamp = 0;
 
     public ControlStatusData(Vector3 benchmarkPosition, Vector3 benchmarkRotation)
     {
@@ -111,7 +131,7 @@ class ControlStatusData
         currentPosition = position;
         currentRotation = rotation;
 
-        lastSampleTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        sampleTimestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
     }
 
     public void UpdateThumbStickValues(Vector2 leftThumbStickValue, Vector2 rightThumbStickValue)
@@ -119,7 +139,7 @@ class ControlStatusData
         this.leftThumbStickValue = leftThumbStickValue;
         this.rightThumbStickValue = rightThumbStickValue;
 
-        lastSampleTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        sampleTimestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
     }
 
     private Object VectorToDict(Object vector)
@@ -165,7 +185,7 @@ class ControlStatusData
             {"lastRotation", VectorToDict(lastRotation)},
             {"currentPosition", VectorToDict(currentPosition)},
             {"currentRotation", VectorToDict(currentRotation)},
-            {"lastSampleTime", lastSampleTime},
+            {"sampleTimestamp", sampleTimestamp},
             {"leftThumbStickValue", VectorToDict(leftThumbStickValue)},
             {"rightThumbStickValue", VectorToDict(rightThumbStickValue)}
         };
