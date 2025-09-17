@@ -37,7 +37,12 @@ public class OperationDetector : MonoBehaviour, IOnEventListener
 
     private void Update()
     {
-        _uiAction?.OnAction();
+        var rotation = transform.rotation.eulerAngles;
+        Debug.Log($"Current rotation angles are: x {rotation.x}, y: {rotation.y}, z: {rotation.z}");
+        if (!ConfigManager.SAMPLE_IN_COROUTINE)
+        {
+            _uiAction?.OnAction();
+        }
     }
 
     private void OnDestroy()

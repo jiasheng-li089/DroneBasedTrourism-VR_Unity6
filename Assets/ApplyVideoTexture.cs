@@ -1,5 +1,6 @@
 using UnityEngine;
 using Unity.WebRTC;
+using UnityEngine.UI;
 
 public class ApplyVideoTexture : MonoBehaviour, IOnEventListener
 {
@@ -38,6 +39,7 @@ public class ApplyVideoTexture : MonoBehaviour, IOnEventListener
                 {
                     Debug.Log($"Received the video data from webrtc: {tex.width} x {tex.height}");
                     planeRender.material.SetTexture("_MainTex", tex);
+                    // rawImage.texture = tex;
                 };
             }
             else if (e.Track is AudioStreamTrack audioTrack)
