@@ -19,6 +19,8 @@ public class OperationDetector : MonoBehaviour, IOnEventListener
 
     private ISchedulableAction<OperationDetector> _uiAction = null;
 
+    private long logTime = 0L;
+
     private void Awake()
     {
         // while only subscribing the video, disable this script 
@@ -37,11 +39,17 @@ public class OperationDetector : MonoBehaviour, IOnEventListener
 
     private void Update()
     {
-        var rotation = transform.rotation.eulerAngles;
-        Debug.Log($"Current rotation angles are: x {rotation.x}, y: {rotation.y}, z: {rotation.z}");
-        if (!ConfigManager.SAMPLE_IN_COROUTINE)
+        if (DateTimeOffset.UtcNow.ToUnixTimeSeconds() - logTime >= 0.5)
         {
-            _uiAction?.OnAction();
+            var rotation = transform.rotation.eulerAngles;
+            var position = transform.position;
+            Debug.Log($"Current rotation angles are x: {rotation.x}, y: {rotation.y}, z: {rotation.z}");
+            Debug.Log($"Current position are x: {position.x}, y: {position.y}, z: {position.z}");
+            if (!ConfigManager.SAMPLE_IN_COROUTINE)
+            {
+                _uiAction?.OnAction();
+            }
+            logTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         }
     }
 
