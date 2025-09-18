@@ -126,11 +126,14 @@ class ControlStatusData
     private Vector2 rightThumbStickValue;
 
     private long sampleTimestamp = 0;
+    
+    private long benchmarkSampleTimestamp = 0;
 
     public ControlStatusData(Vector3 benchmarkPosition, Vector3 benchmarkRotation)
     {
         this.benchmarkPosition = benchmarkPosition;
         this.benchmarkRotation = benchmarkRotation;
+        this.benchmarkSampleTimestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
         currentPosition = lastPosition = benchmarkPosition;
         currentRotation = lastRotation = benchmarkRotation;
@@ -199,6 +202,7 @@ class ControlStatusData
             {"currentPosition", VectorToDict(currentPosition)},
             {"currentRotation", VectorToDict(currentRotation)},
             {"sampleTimestamp", sampleTimestamp},
+            {"benchmarkSampleTimestamp", benchmarkSampleTimestamp},
             {"leftThumbStickValue", VectorToDict(leftThumbStickValue)},
             {"rightThumbStickValue", VectorToDict(rightThumbStickValue)}
         };
