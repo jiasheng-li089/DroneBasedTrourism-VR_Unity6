@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Newtonsoft.Json;
 using UnityEngine;
+using UnityEngine.UI;
 using UnityEngine.XR.Interaction.Toolkit.Inputs.Readers;
 using Object = System.Object;
 
@@ -18,6 +19,9 @@ public class OperationDetector : MonoBehaviour, IOnEventListener
     private ISchedulableAction<OperationDetector> _schedulableAction;
 
     private ISchedulableAction<OperationDetector> _uiAction = null;
+
+    [SerializeField]
+    private Text mStatusText = null;
 
     private long logTime = 0L;
 
@@ -128,15 +132,22 @@ class ControlStatusData
     private long sampleTimestamp = 0;
     
     private long benchmarkSampleTimestamp = 0;
+    
+    private float _rotationVelocity;
+
+    private float _smoothHeadRotationY = 0f;
 
     public ControlStatusData(Vector3 benchmarkPosition, Vector3 benchmarkRotation)
     {
         this.benchmarkPosition = benchmarkPosition;
         this.benchmarkRotation = benchmarkRotation;
-        this.benchmarkSampleTimestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        benchmarkSampleTimestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
         currentPosition = lastPosition = benchmarkPosition;
         currentRotation = lastRotation = benchmarkRotation;
+        
+        _rotationVelocity = 0f;
+        _smoothHeadRotationY = 0f;
     }
 
     public void UpdateLocationAndRotation(Vector3 position, Vector3 rotation)
@@ -146,6 +157,14 @@ class ControlStatusData
 
         currentPosition = position;
         currentRotation = rotation;
+
+        float angleDelta = Mathf.DeltaAngle(_smoothHeadRotationY, currentRotation.y - benchmarkRotation.y);
+
+        float smoothedDelta = Mathf.SmoothDampAngle(0, angleDelta, ref _rotationVelocity, 0.01f);
+
+        _smoothHeadRotationY += smoothedDelta;
+        
+        currentRotation.y = (_smoothHeadRotationY + benchmarkRotation.y + 360) % 360f;
 
         sampleTimestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
     }
@@ -215,6 +234,7 @@ class MovementDetectorAction : PeriodicalAction<OperationDetector>
 
     private ControlStatusData _statusData;
 
+
     public MovementDetectorAction(OperationDetector host, long interval) : base(host, interval)
     {
         _webRtcManager = host.GetComponentInParent<WebRtcManager>();
@@ -232,11 +252,13 @@ class MovementDetectorAction : PeriodicalAction<OperationDetector>
         {
             InitializeBenchmark();
         }
-
-        _statusData.UpdateLocationAndRotation(Host.gameObject.transform.position,
-            Host.gameObject.transform.eulerAngles);
-        _statusData.UpdateThumbStickValues(Host.m_LeftThumbStickReader.ReadValue(),
-            Host.m_RightThumbStickReader.ReadValue());
+        else
+        {
+            _statusData.UpdateLocationAndRotation(Host.gameObject.transform.position,
+                Host.gameObject.transform.eulerAngles);
+            _statusData.UpdateThumbStickValues(Host.m_LeftThumbStickReader.ReadValue(),
+                Host.m_RightThumbStickReader.ReadValue());
+        }
 
         _webRtcManager.Send(JsonConvert.SerializeObject(_statusData.ToDictionary()), "ControlStatus");
     }
