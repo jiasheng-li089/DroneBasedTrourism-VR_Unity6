@@ -20,9 +20,6 @@ public class OperationDetector : MonoBehaviour, IOnEventListener
 
     private ISchedulableAction<OperationDetector> _uiAction = null;
 
-    [SerializeField]
-    private Text mStatusText = null;
-
     private long logTime = 0L;
 
     private void Awake()
@@ -117,34 +114,43 @@ public class OperationDetector : MonoBehaviour, IOnEventListener
 
 class ControlStatusData
 {
-    private Vector3 benchmarkPosition;
-    private Vector3 benchmarkRotation;
+    private readonly Vector3 _benchmarkPosition;
+    private readonly Vector3 _benchmarkRotation;
 
-    private Vector3 lastPosition;
-    private Vector3 lastRotation;
+    private Vector3 _lastPosition;
+    private Vector3 _lastRotation;
 
-    private Vector3 currentPosition;
-    private Vector3 currentRotation;
+    private Vector3 _currentPosition;
+    private Vector3 _currentRotation;
 
-    private Vector2 leftThumbStickValue;
-    private Vector2 rightThumbStickValue;
+    private Vector2 _leftThumbStickValue;
+    private Vector2 _rightThumbStickValue;
 
-    private long sampleTimestamp = 0;
+    private long _sampleTimestamp = 0;
     
-    private long benchmarkSampleTimestamp = 0;
+    private readonly long _benchmarkSampleTimestamp = 0;
     
     private float _rotationVelocity;
-
     private float _smoothHeadRotationY = 0f;
+
+    private float _xVelocity;
+    private float _smoothX;
+
+    private float _yVelocity;
+    private float _smoothY;
+
+    private float _zVelocity;
+    private float _smoothZ;
 
     public ControlStatusData(Vector3 benchmarkPosition, Vector3 benchmarkRotation)
     {
-        this.benchmarkPosition = benchmarkPosition;
-        this.benchmarkRotation = benchmarkRotation;
-        benchmarkSampleTimestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        this._benchmarkPosition = benchmarkPosition;
+        this._benchmarkRotation = benchmarkRotation;
+        _benchmarkSampleTimestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        _sampleTimestamp = _benchmarkSampleTimestamp;
 
-        currentPosition = lastPosition = benchmarkPosition;
-        currentRotation = lastRotation = benchmarkRotation;
+        _currentPosition = _lastPosition = benchmarkPosition;
+        _currentRotation = _lastRotation = benchmarkRotation;
         
         _rotationVelocity = 0f;
         _smoothHeadRotationY = 0f;
@@ -152,29 +158,33 @@ class ControlStatusData
 
     public void UpdateLocationAndRotation(Vector3 position, Vector3 rotation)
     {
-        lastPosition = currentPosition;
-        lastRotation = currentRotation;
+        _lastPosition = _currentPosition;
+        _lastRotation = _currentRotation;
 
-        currentPosition = position;
-        currentRotation = rotation;
+        _currentPosition = position;
+        _currentRotation = rotation;
 
-        float angleDelta = Mathf.DeltaAngle(_smoothHeadRotationY, currentRotation.y - benchmarkRotation.y);
-
-        float smoothedDelta = Mathf.SmoothDampAngle(0, angleDelta, ref _rotationVelocity, 0.01f);
-
-        _smoothHeadRotationY += smoothedDelta;
+        _smoothHeadRotationY += SmoothDataChange(_smoothHeadRotationY, _currentRotation.y - _benchmarkRotation.y, ref _rotationVelocity, true);
+        _currentRotation.y = (_smoothHeadRotationY + _benchmarkRotation.y + 360) % 360f;
         
-        currentRotation.y = (_smoothHeadRotationY + benchmarkRotation.y + 360) % 360f;
+        _smoothX += SmoothDataChange(_smoothX, _currentPosition.x - _benchmarkPosition.x, ref _xVelocity, false);
+        _currentPosition.x = _smoothX;
 
-        sampleTimestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        _smoothY += SmoothDataChange(_smoothY, _currentPosition.y - _benchmarkPosition.y, ref _yVelocity, false);
+        _currentPosition.y = _smoothY;
+
+        _smoothZ += SmoothDataChange(_smoothZ, _currentPosition.z - _benchmarkPosition.z, ref _zVelocity, false);
+        _currentPosition.z = _smoothZ;
+
+        _sampleTimestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
     }
 
     public void UpdateThumbStickValues(Vector2 leftThumbStickValue, Vector2 rightThumbStickValue)
     {
-        this.leftThumbStickValue = leftThumbStickValue;
-        this.rightThumbStickValue = rightThumbStickValue;
+        _leftThumbStickValue = leftThumbStickValue;
+        _rightThumbStickValue = rightThumbStickValue;
 
-        sampleTimestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        _sampleTimestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
     }
 
     private Object VectorToDict(Object vector)
@@ -214,17 +224,31 @@ class ControlStatusData
     {
         return new Dictionary<string, object>
         {
-            {"benchmarkPosition", VectorToDict(benchmarkPosition)},
-            {"benchmarkRotation", VectorToDict(benchmarkRotation)},
-            {"lastPosition", VectorToDict(lastPosition)},
-            {"lastRotation", VectorToDict(lastRotation)},
-            {"currentPosition", VectorToDict(currentPosition)},
-            {"currentRotation", VectorToDict(currentRotation)},
-            {"sampleTimestamp", sampleTimestamp},
-            {"benchmarkSampleTimestamp", benchmarkSampleTimestamp},
-            {"leftThumbStickValue", VectorToDict(leftThumbStickValue)},
-            {"rightThumbStickValue", VectorToDict(rightThumbStickValue)}
+            {"benchmarkPosition", VectorToDict(_benchmarkPosition)},
+            {"benchmarkRotation", VectorToDict(_benchmarkRotation)},
+            {"lastPosition", VectorToDict(_lastPosition)},
+            {"lastRotation", VectorToDict(_lastRotation)},
+            {"currentPosition", VectorToDict(_currentPosition)},
+            {"currentRotation", VectorToDict(_currentRotation)},
+            {"sampleTimestamp", _sampleTimestamp},
+            {"benchmarkSampleTimestamp", _benchmarkSampleTimestamp},
+            {"leftThumbStickValue", VectorToDict(_leftThumbStickValue)},
+            {"rightThumbStickValue", VectorToDict(_rightThumbStickValue)}
         };
+    }
+
+    private float SmoothDataChange(float currentValue, float targetValue, ref float velocity, bool isAngle)
+    {
+        if (isAngle)
+        {
+            float delta = Mathf.DeltaAngle(currentValue, targetValue);
+            return Mathf.SmoothDampAngle(0, delta, ref velocity, 0.01f);
+        }
+        else
+        {
+            float delta = targetValue - currentValue;
+            return Mathf.SmoothDamp(0, delta, ref velocity, 0.01f);
+        }
     }
 }
 
