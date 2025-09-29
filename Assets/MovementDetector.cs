@@ -168,13 +168,13 @@ class ControlStatusData
         _currentRotation.y = (_smoothHeadRotationY + _benchmarkRotation.y + 360) % 360f;
         
         _smoothX += SmoothDataChange(_smoothX, _currentPosition.x - _benchmarkPosition.x, ref _xVelocity, false);
-        _currentPosition.x = _smoothX;
+        _currentPosition.x = _smoothX + _benchmarkPosition.x;
 
-        _smoothY += SmoothDataChange(_smoothY, _currentPosition.y - _benchmarkPosition.y, ref _yVelocity, false);
-        _currentPosition.y = _smoothY;
+        // _smoothY += SmoothDataChange(_smoothY, _currentPosition.y - _benchmarkPosition.y, ref _yVelocity, false, 0.0001f);
+        // _currentPosition.y = _smoothY + _benchmarkPosition.y;
 
-        _smoothZ += SmoothDataChange(_smoothZ, _currentPosition.z - _benchmarkPosition.z, ref _zVelocity, false);
-        _currentPosition.z = _smoothZ;
+        _smoothZ += SmoothDataChange(_smoothZ, _currentPosition.z - _benchmarkPosition.z, ref _zVelocity, false, 0.0001f);
+        _currentPosition.z = _smoothZ + _benchmarkPosition.z;
 
         _sampleTimestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
     }
@@ -237,17 +237,17 @@ class ControlStatusData
         };
     }
 
-    private float SmoothDataChange(float currentValue, float targetValue, ref float velocity, bool isAngle)
+    private float SmoothDataChange(float currentValue, float targetValue, ref float velocity, bool isAngle, float smoothTime = 0.01f)
     {
         if (isAngle)
         {
             float delta = Mathf.DeltaAngle(currentValue, targetValue);
-            return Mathf.SmoothDampAngle(0, delta, ref velocity, 0.01f);
+            return Mathf.SmoothDampAngle(0, delta, ref velocity, smoothTime);
         }
         else
         {
             float delta = targetValue - currentValue;
-            return Mathf.SmoothDamp(0, delta, ref velocity, 0.01f);
+            return Mathf.SmoothDamp(0, delta, ref velocity, smoothTime);
         }
     }
 }
