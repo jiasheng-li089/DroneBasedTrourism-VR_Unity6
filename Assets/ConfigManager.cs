@@ -5,6 +5,8 @@ public static class ConfigManager
 {
     public const bool DEBUG = true;
 
+    public const bool MOCK = false;
+
     public const bool ONLY_VIDEO = false;
 
     public const long SAMPLING_INTERVAL_IN_MILLISECONDS = 40L;

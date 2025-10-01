@@ -7,6 +7,9 @@ public class StatusInformationRender : MonoBehaviour, IOnEventListener
     [SerializeField]
     private Text statusText;
     
+    [SerializeField]
+    private Text positionAndRotationText;
+    
     // Start is called once before the first execution of Update after the MonoBehaviour is created
 
     private void Awake()

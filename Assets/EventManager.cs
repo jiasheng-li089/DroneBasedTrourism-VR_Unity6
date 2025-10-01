@@ -73,6 +73,7 @@ public class EventManager : MonoBehaviour
         {
             Destroy(gameObject);
         }
+        new Logger().Start();
     }
 
 

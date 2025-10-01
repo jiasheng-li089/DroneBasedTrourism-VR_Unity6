@@ -5,6 +5,9 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.XR.Interaction.Toolkit.Inputs.Readers;
 using Object = System.Object;
+using Vector2 = UnityEngine.Vector2;
+using Vector3 = UnityEngine.Vector3;
+
 
 public class OperationDetector : MonoBehaviour, IOnEventListener
 {
@@ -20,7 +23,18 @@ public class OperationDetector : MonoBehaviour, IOnEventListener
 
     private ISchedulableAction<OperationDetector> _uiAction = null;
 
+    [SerializeField]
+    public Text _infoTxt;
+
+    [SerializeField]
+    public Text _debugTxt;
+
     private long logTime = 0L;
+    
+    private static string TAG = "OperationDetector";
+
+    private Vector3? _benchmarkRotation = null;
+    private Vector3? _benchmarkPosition = null;
 
     private void Awake()
     {
@@ -31,27 +45,65 @@ public class OperationDetector : MonoBehaviour, IOnEventListener
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
-        var lastPosition = transform.position;
-        var initialRotation = transform.rotation.eulerAngles;
-
-        Debug.Log("Initial Position: " + lastPosition + ", Initial Rotation: " + initialRotation);
         EventManager.Instance.Observe(EventManager.CHANNEL_MSG, this);
+
+        if (ConfigManager.MOCK)
+        {
+            StartTrackingAndSendData();
+        }
     }
 
-    private void Update()
+    public void Update()
     {
         if (DateTimeOffset.UtcNow.ToUnixTimeSeconds() - logTime >= 0.5)
         {
             var rotation = transform.rotation.eulerAngles;
             var position = transform.position;
-            Debug.Log($"Current rotation angles are x: {rotation.x}, y: {rotation.y}, z: {rotation.z}");
-            Debug.Log($"Current position are x: {position.x}, y: {position.y}, z: {position.z}");
+
+            if (null == _benchmarkRotation)
+            {
+                _benchmarkRotation = rotation;
+                _benchmarkPosition = position;
+                return;
+            }
+            Vector3 benchmarkPosition = (Vector3)_benchmarkPosition;
+            Vector3 benchmarkRotation = (Vector3)_benchmarkRotation; 
+            
+            float benchmarkAngle = (360 - benchmarkRotation.y) % 360 * Mathf.Deg2Rad;
+            float xOffset = position.x - benchmarkPosition.x;
+            float zOffset = position.z - benchmarkPosition.z;
+        
+            float x = xOffset * Mathf.Cos(benchmarkAngle) - zOffset * Mathf.Sin(benchmarkAngle);
+            float z = xOffset * Mathf.Sin(benchmarkAngle) + zOffset * Mathf.Cos(benchmarkAngle);
+            if (benchmarkRotation.y is >= 45 and <= 135 or >= 225 and <= 315)
+            {
+                x = -x;
+                z = -z;
+            }
+            Vector3 newPosition = new Vector3(x, position.y, z);
+            Vector3 newRotation = new Vector3(rotation.x, (rotation.y - benchmarkRotation.y + 360) % 360, rotation.z); 
+            
+            if (null == _schedulableAction)
+            {
+                UpdatePositionAndRotationInfo(newPosition, newRotation);
+                UpdateRealPositionAndRotationInfo(position, rotation);
+            }
             if (!ConfigManager.SAMPLE_IN_COROUTINE)
             {
                 _uiAction?.OnAction();
             }
             logTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         }
+    }
+
+    public void UpdatePositionAndRotationInfo(Vector3 position, Vector3 rotation)
+    {
+        _infoTxt.text = $"P({position.x:F2}, {position.z:F2})\tR({rotation.y:F2})";
+    }
+
+    private void UpdateRealPositionAndRotationInfo(Vector3 position, Vector3 rotation)
+    {
+        _debugTxt.text = $"P({position.x:F2}, {position.z:F2})\tR({rotation.y:F2})";
     }
 
     private void OnDestroy()
@@ -70,34 +122,7 @@ public class OperationDetector : MonoBehaviour, IOnEventListener
 
         if ("Start" == msg.data)
         {
-            Debug.Log("Received start control command from the drone");
-            // hint the user to get ready
-            EventManager.Instance.Notify(EventManager.GUIDE_INFO,
-                "Get ready. Please stay still and don't move the thumb sticks on the controllers");
-            _schedulableAction?.Stop();
-
-            _schedulableAction = new SimpleDelayAction<OperationDetector>(this, ConfigManager.PERIOD_FOR_USER_TO_PREPARE, () =>
-            {
-                EventManager.Instance.Notify(EventManager.GUIDE_INFO, "Go");
-
-                var tmp = new MovementDetectorAction(this, ConfigManager.SAMPLING_INTERVAL_IN_MILLISECONDS);
-                if (!_schedulableAction.IsFinished())
-                {
-                    if (ConfigManager.SAMPLE_IN_COROUTINE)
-                    {
-                        StartCoroutine(tmp.Start());
-                        _schedulableAction?.Stop();
-                        _schedulableAction = tmp;
-                    }
-                    else
-                    {
-                        _uiAction = tmp;
-                        _schedulableAction?.Stop();
-                        _schedulableAction = null;
-                    }
-                }
-            });
-            StartCoroutine(_schedulableAction.Start());
+            StartTrackingAndSendData();
         }
         else if ("Stop" == msg.data)
         {
@@ -110,13 +135,47 @@ public class OperationDetector : MonoBehaviour, IOnEventListener
             EventManager.Instance.Notify(EventManager.GUIDE_INFO, "Control abort");
         }
     }
+
+    private void StartTrackingAndSendData()
+    {
+        Debug.Log("Received start control command from the drone");
+        // hint the user to get ready
+        EventManager.Instance.Notify(EventManager.GUIDE_INFO,
+            "Get ready. Please stay still and don't move the thumb sticks on the controllers");
+        _schedulableAction?.Stop();
+
+        _schedulableAction = new SimpleDelayAction<OperationDetector>(this, ConfigManager.PERIOD_FOR_USER_TO_PREPARE, () =>
+        {
+            EventManager.Instance.Notify(EventManager.GUIDE_INFO, "Go");
+
+            var tmp = new MovementDetectorAction(this, ConfigManager.SAMPLING_INTERVAL_IN_MILLISECONDS);
+            if (!_schedulableAction.IsFinished())
+            {
+                if (ConfigManager.SAMPLE_IN_COROUTINE)
+                {
+                    StartCoroutine(tmp.Start());
+                    _schedulableAction?.Stop();
+                    _schedulableAction = tmp;
+                }
+                else
+                {
+                    _uiAction = tmp;
+                    _schedulableAction?.Stop();
+                    _schedulableAction = null;
+                }
+            }
+        });
+        StartCoroutine(_schedulableAction.Start());
+    }
 }
 
 class ControlStatusData
 {
-    private readonly Vector3 _benchmarkPosition;
-    private readonly Vector3 _benchmarkRotation;
+    // these two fields reflect the real position and orientation of the headset for benchmark
+    private Vector3? _benchmarkPosition;
+    private Vector3? _benchmarkRotation;
 
+    // these four fields are relative to the benchmark
     private Vector3 _lastPosition;
     private Vector3 _lastRotation;
 
@@ -128,35 +187,74 @@ class ControlStatusData
 
     private long _sampleTimestamp = 0;
     
-    private readonly long _benchmarkSampleTimestamp = 0;
+    private long _benchmarkSampleTimestamp = 0;
     
+    // the following fields are only used for smoothing calculation, won't be serialized to the json
     private float _rotationVelocity;
     private float _smoothHeadRotationY = 0f;
-
     private float _xVelocity;
     private float _smoothX;
-
     private float _yVelocity;
     private float _smoothY;
-
     private float _zVelocity;
     private float _smoothZ;
 
-    public ControlStatusData(Vector3 benchmarkPosition, Vector3 benchmarkRotation)
-    {
-        this._benchmarkPosition = benchmarkPosition;
-        this._benchmarkRotation = benchmarkRotation;
-        _benchmarkSampleTimestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-        _sampleTimestamp = _benchmarkSampleTimestamp;
-
-        _currentPosition = _lastPosition = benchmarkPosition;
-        _currentRotation = _lastRotation = benchmarkRotation;
-        
-        _rotationVelocity = 0f;
-        _smoothHeadRotationY = 0f;
-    }
+    private static string TAG = "ControlStatusData";
 
     public void UpdateLocationAndRotation(Vector3 position, Vector3 rotation)
+    {
+        if (null == _benchmarkRotation || null == _benchmarkPosition)
+        {
+            _benchmarkRotation = rotation;
+            _benchmarkPosition = position;
+
+            _benchmarkSampleTimestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            _sampleTimestamp = _benchmarkSampleTimestamp;
+
+            _currentPosition = new Vector3();
+            _currentRotation = new Vector3();
+            _lastPosition = _currentPosition;
+            _lastRotation = _currentRotation;
+            
+            return;
+        }
+
+        
+        Vector3 benchmarkPosition = (Vector3)_benchmarkPosition;
+        Vector3 benchmarkRotation = (Vector3)_benchmarkRotation; 
+            
+        float benchmarkAngle = (360 - benchmarkRotation.y) % 360 * Mathf.Deg2Rad;
+        float xOffset = position.x - benchmarkPosition.x;
+        float zOffset = position.z - benchmarkPosition.z;
+        
+        float x = xOffset * Mathf.Cos(benchmarkAngle) - zOffset * Mathf.Sin(benchmarkAngle);
+        float z = xOffset * Mathf.Sin(benchmarkAngle) + zOffset * Mathf.Cos(benchmarkAngle);
+        if (benchmarkRotation.y is >= 45 and <= 135 or >= 225 and <= 315)
+        {
+            x = -x;
+            z = -z;
+        }
+
+        Vector3 newPosition = new Vector3(x, position.y, z);
+        Vector3 newRotation = new Vector3(rotation.x, (rotation.y - benchmarkRotation.y + 360) % 360, rotation.z);
+        
+        SmoothMotion(newPosition, newRotation);
+    }
+
+    public Vector3 GetCurrentPosition()
+    {
+        return _currentPosition;
+    }
+
+    public Vector3 GetCurrentRotation()
+    {
+        return _currentRotation;
+    }
+
+    /**
+     * Smooth the motion, the position and the rotation are relative ones, no need to minus benchmark anymore
+     */
+    private void SmoothMotion(Vector3 position, Vector3 rotation)
     {
         _lastPosition = _currentPosition;
         _lastRotation = _currentRotation;
@@ -164,17 +262,17 @@ class ControlStatusData
         _currentPosition = position;
         _currentRotation = rotation;
 
-        _smoothHeadRotationY += SmoothDataChange(_smoothHeadRotationY, _currentRotation.y - _benchmarkRotation.y, ref _rotationVelocity, true);
-        _currentRotation.y = (_smoothHeadRotationY + _benchmarkRotation.y + 360) % 360f;
+        _smoothHeadRotationY += SmoothDataChange(_smoothHeadRotationY, _currentRotation.y, ref _rotationVelocity, true);
+        _currentRotation.y = (_smoothHeadRotationY + 360) % 360f;
         
-        _smoothX += SmoothDataChange(_smoothX, _currentPosition.x - _benchmarkPosition.x, ref _xVelocity, false);
-        _currentPosition.x = _smoothX + _benchmarkPosition.x;
+        _smoothX += SmoothDataChange(_smoothX, _currentPosition.x, ref _xVelocity, false);
+        _currentPosition.x = _smoothX;
 
-        // _smoothY += SmoothDataChange(_smoothY, _currentPosition.y - _benchmarkPosition.y, ref _yVelocity, false, 0.0001f);
-        // _currentPosition.y = _smoothY + _benchmarkPosition.y;
+        // _smoothY += SmoothDataChange(_smoothY, _currentPosition.y, ref _yVelocity, false, 0.0001f);
+        // _currentPosition.y = _smoothY;
 
-        _smoothZ += SmoothDataChange(_smoothZ, _currentPosition.z - _benchmarkPosition.z, ref _zVelocity, false, 0.0001f);
-        _currentPosition.z = _smoothZ + _benchmarkPosition.z;
+        _smoothZ += SmoothDataChange(_smoothZ, _currentPosition.z, ref _zVelocity, false, 0.0001f);
+        _currentPosition.z = _smoothZ;
 
         _sampleTimestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
     }
@@ -224,8 +322,8 @@ class ControlStatusData
     {
         return new Dictionary<string, object>
         {
-            {"benchmarkPosition", VectorToDict(_benchmarkPosition)},
-            {"benchmarkRotation", VectorToDict(_benchmarkRotation)},
+            {"benchmarkPosition", VectorToDict(new Vector3())},
+            {"benchmarkRotation", VectorToDict(new Vector3())},
             {"lastPosition", VectorToDict(_lastPosition)},
             {"lastRotation", VectorToDict(_lastRotation)},
             {"currentPosition", VectorToDict(_currentPosition)},
@@ -266,8 +364,8 @@ class MovementDetectorAction : PeriodicalAction<OperationDetector>
 
     private void InitializeBenchmark()
     {
-        // TODO right here, show I use the position or localPosition???
-        _statusData = new ControlStatusData(Host.gameObject.transform.position, Host.gameObject.transform.eulerAngles);
+        _statusData = new ControlStatusData();
+        _statusData.UpdateLocationAndRotation(Host.gameObject.transform.position, Host.gameObject.transform.eulerAngles);
     }
 
     public override void OnAction()
@@ -284,6 +382,8 @@ class MovementDetectorAction : PeriodicalAction<OperationDetector>
                 Host.m_RightThumbStickReader.ReadValue());
         }
 
-        _webRtcManager.Send(JsonConvert.SerializeObject(_statusData.ToDictionary()), "ControlStatus");
+        string serialMsg = JsonConvert.SerializeObject(_statusData.ToDictionary());
+        _webRtcManager.Send(serialMsg, "ControlStatus");
+        Host.UpdatePositionAndRotationInfo(_statusData.GetCurrentPosition(), _statusData.GetCurrentRotation());
     }
 }
