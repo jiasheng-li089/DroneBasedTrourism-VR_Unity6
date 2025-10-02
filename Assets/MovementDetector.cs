@@ -83,7 +83,7 @@ public class OperationDetector : MonoBehaviour, IOnEventListener
             Vector3 newPosition = new Vector3(x, position.y, z);
             Vector3 newRotation = new Vector3(rotation.x, (rotation.y - benchmarkRotation.y + 360) % 360, rotation.z); 
             
-            if (null == _schedulableAction)
+            if (null == _schedulableAction && ConfigManager.DEBUG)
             {
                 UpdatePositionAndRotationInfo(newPosition, newRotation);
                 UpdateRealPositionAndRotationInfo(position, rotation);
