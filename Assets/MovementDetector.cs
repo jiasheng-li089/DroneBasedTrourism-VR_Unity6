@@ -384,6 +384,9 @@ class MovementDetectorAction : PeriodicalAction<OperationDetector>
 
         string serialMsg = JsonConvert.SerializeObject(_statusData.ToDictionary());
         _webRtcManager.Send(serialMsg, "ControlStatus");
-        Host.UpdatePositionAndRotationInfo(_statusData.GetCurrentPosition(), _statusData.GetCurrentRotation());
+        if (ConfigManager.DEBUG)
+        {
+            Host.UpdatePositionAndRotationInfo(_statusData.GetCurrentPosition(), _statusData.GetCurrentRotation());
+        }
     }
 }

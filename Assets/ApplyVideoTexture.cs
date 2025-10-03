@@ -1,6 +1,5 @@
 using UnityEngine;
 using Unity.WebRTC;
-using UnityEngine.UI;
 
 public class ApplyVideoTexture : MonoBehaviour, IOnEventListener
 {
@@ -50,12 +49,6 @@ public class ApplyVideoTexture : MonoBehaviour, IOnEventListener
                 audioSource.Play();
             }
         };
-        // RTCRtpTransceiverInit init = new()
-        // {
-        //     direction = RTCRtpTransceiverDirection.RecvOnly
-        // };
-        // connection.AddTransceiver(TrackKind.Video, init);
-        // connection.AddTransceiver(TrackKind.Audio, init);
     }
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created

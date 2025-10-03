@@ -3,7 +3,7 @@ using UnityEngine;
 
 public static class ConfigManager
 {
-    // set to false to get rid of all the debug information on the screen
+    // set false to get rid of all the debug information on the screen
     public const bool DEBUG = false;
 
     // mock to trigger the tracking headset movement rather than waiting for start command
