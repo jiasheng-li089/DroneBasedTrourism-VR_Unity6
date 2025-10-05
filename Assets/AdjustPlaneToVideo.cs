@@ -1,3 +1,6 @@
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 using UnityEngine;
 
 public class AdjustPlaneToVideo : MonoBehaviour
@@ -19,6 +22,18 @@ public class AdjustPlaneToVideo : MonoBehaviour
 
         Canvas canvas = Camera.main.GetComponentInChildren<Canvas>();
         Debug.Log(canvas);
+        if (ConfigManager.ONLY_VIDEO)
+        {
+            transform.localPosition = new Vector3(0, 0, 4.9f);
+#if UNITY_EDITOR
+            EditorWindow gameView = EditorWindow.GetWindow(typeof(EditorWindow).Assembly.GetType("UnityEditor.GameView"));
+            gameView.maximized = true;
+#endif
+        }
+        else
+        {
+            transform.localPosition = new Vector3(0, 0, 7.5f);
+        }
     }
 
     // Update is called once per frame
