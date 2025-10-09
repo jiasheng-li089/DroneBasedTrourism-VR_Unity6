@@ -462,7 +462,14 @@ public class WebRtcManager : MonoBehaviour, ITaskExecutor, IOnEventListener
                 new PublicationConnection(DATA_SENDER, whipSupportTypes, _videoRoomOfferExchanger, this);
             _connections.Add(DATA_SENDER, connection);
         }
-        
+
+        // list all supported codecs
+        var codecs = RTCRtpSender.GetCapabilities(TrackKind.Video).codecs;
+        foreach (var tmpCodec in codecs)
+        {
+            Debug.Log($"Supported Codec: {tmpCodec.mimeType}");
+        }
+
         _streamingOfferExchanger = new StreamingOfferExchanger();
         connection = new SubscriptionConnection(VIDEO_RECEIVER, new HashSet<string>
         {

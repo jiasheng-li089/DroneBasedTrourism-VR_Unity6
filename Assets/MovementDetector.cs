@@ -14,10 +14,10 @@ public class OperationDetector : MonoBehaviour, IOnEventListener
 
 
     [SerializeField]
-    public XRInputValueReader<Vector2> m_LeftThumbStickReader = new XRInputValueReader<Vector2>("Thumbstick");
+    public XRInputValueReader<Vector2> m_LeftThumbStickReader;
 
     [SerializeField]
-    public XRInputValueReader<Vector2> m_RightThumbStickReader = new XRInputValueReader<Vector2>("Thumbstick");
+    public XRInputValueReader<Vector2> m_RightThumbStickReader;
 
     private ISchedulableAction<OperationDetector> _schedulableAction;
 
@@ -86,7 +86,7 @@ public class OperationDetector : MonoBehaviour, IOnEventListener
             if (null == _schedulableAction && ConfigManager.DEBUG)
             {
                 UpdatePositionAndRotationInfo(newPosition, newRotation);
-                UpdateRealPositionAndRotationInfo(position, rotation);
+                UpdateRealPositionAndRotationInfo(position, rotation, m_LeftThumbStickReader.ReadValue(), m_RightThumbStickReader.ReadValue());
             }
             if (!ConfigManager.SAMPLE_IN_COROUTINE)
             {
@@ -101,9 +101,10 @@ public class OperationDetector : MonoBehaviour, IOnEventListener
         _infoTxt.text = $"P({position.x:F2}, {position.z:F2})\tR({rotation.y:F2})";
     }
 
-    private void UpdateRealPositionAndRotationInfo(Vector3 position, Vector3 rotation)
+    public void UpdateRealPositionAndRotationInfo(Vector3 position, Vector3 rotation,
+        Vector2 leftThumbStickValue, Vector2 rightThumbStickValue)
     {
-        _debugTxt.text = $"P({position.x:F2}, {position.z:F2})\tR({rotation.y:F2})";
+        _debugTxt.text = $"P({position.x:F2}, {position.z:F2}) R({rotation.y:F2}) L({leftThumbStickValue.x:F2}, {leftThumbStickValue.y:F2}), R({rightThumbStickValue.x:F2}, {rightThumbStickValue.y:F2})";
     }
 
     private void OnDestroy()
@@ -146,8 +147,14 @@ public class OperationDetector : MonoBehaviour, IOnEventListener
 
         _schedulableAction = new SimpleDelayAction<OperationDetector>(this, ConfigManager.PERIOD_FOR_USER_TO_PREPARE, () =>
         {
+            // show tips telling user ready to go
             EventManager.Instance.Notify(EventManager.GUIDE_INFO, "Go");
 
+            StartCoroutine(new SimpleDelayAction<OperationDetector>(this, ConfigManager.PERIOD_FOR_USER_TO_PREPARE + 2000, () =>
+            {
+                // hide the tips
+                EventManager.Instance.Notify(EventManager.GUIDE_INFO, "");
+            }).Start());
             var tmp = new MovementDetectorAction(this, ConfigManager.SAMPLING_INTERVAL_IN_MILLISECONDS);
             if (!_schedulableAction.IsFinished())
             {
@@ -386,7 +393,9 @@ class MovementDetectorAction : PeriodicalAction<OperationDetector>
         _webRtcManager.Send(serialMsg, "ControlStatus");
         if (ConfigManager.DEBUG)
         {
-            Host.UpdatePositionAndRotationInfo(_statusData.GetCurrentPosition(), _statusData.GetCurrentRotation());
+            Host.UpdateRealPositionAndRotationInfo(_statusData.GetCurrentPosition(),
+                _statusData.GetCurrentRotation(), Host.m_LeftThumbStickReader.ReadValue(),
+                Host.m_RightThumbStickReader.ReadValue());
         }
     }
 }
