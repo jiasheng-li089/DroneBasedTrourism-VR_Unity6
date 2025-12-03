@@ -8,9 +8,12 @@ public class Logger {
     
     private string _filePath;
 
+    private StreamWriter _fileWriter;
+
     public void Start()
     {
         _filePath = Path.Combine(Application.persistentDataPath, DateTime.Now.ToString("yyyy-MM-dd-HH-mm") + ".log");
+        _fileWriter = new StreamWriter(_filePath);
         Instance = this;
     }
 
@@ -19,12 +22,16 @@ public class Logger {
     {
         try
         {
-            File.AppendAllTextAsync(_filePath,
-                DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "\t" + tag + "\t" + msg + "\n");
+            _fileWriter.WriteLineAsync(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff") + "\t" + tag + "\t" + msg);
         }
         catch (System.Exception e)
         {
             Debug.LogError(e);
         }
+    }
+
+    public void Stop()
+    {
+        _fileWriter.Close();
     }
 }

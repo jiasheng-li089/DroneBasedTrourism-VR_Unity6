@@ -479,7 +479,7 @@ public class WebRtcManager : MonoBehaviour, ITaskExecutor, IOnEventListener
         _connections.Add(VIDEO_RECEIVER, connection);
 
         // INFO for debugging, show detail logs of webrtc, the log is quite chattering
-        // WebRTC.ConfigureNativeLogging(true, NativeLoggingSeverity.Error);
+         WebRTC.ConfigureNativeLogging(true, NativeLoggingSeverity.Error);
         StartCoroutine(WebRTC.Update());
         foreach (var conn in _connections)
         {

@@ -111,6 +111,8 @@ public class OperationDetector : MonoBehaviour, IOnEventListener
     {
         _schedulableAction?.Stop();
         EventManager.Instance.UnObserve(EventManager.CHANNEL_MSG, this);
+        
+        Logger.Instance.Log("ControlStatusData", "Position tracking stops");
     }
 
     public void OnEvent(string ev, object arg)
@@ -223,6 +225,8 @@ class ControlStatusData
             _lastPosition = _currentPosition;
             _lastRotation = _currentRotation;
             
+            Logger.Instance.Log(TAG, "Position tracking starts");
+            
             return;
         }
 
@@ -246,6 +250,9 @@ class ControlStatusData
         Vector3 newRotation = new Vector3(rotation.x, (rotation.y - benchmarkRotation.y + 360) % 360, rotation.z);
         
         SmoothMotion(newPosition, newRotation);
+
+        Logger.Instance.Log(TAG, $"raw position-> x: {newPosition.x}, y: {newPosition.y}, z: {newPosition.z},\t smooth x: {_currentPosition}, y: {_currentPosition.y}, z: {_currentPosition.z}");
+        Logger.Instance.Log(TAG, $"raw rotation-> y: {newRotation.y},\t smooth y: {_currentRotation.y}");
     }
 
     public Vector3 GetCurrentPosition()

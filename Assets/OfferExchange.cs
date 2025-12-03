@@ -118,7 +118,7 @@ public class VideoRoomOfferExchanger : IOfferExchanger
 
     private const string ACTION_EVENT = "event";
 
-    private const string WEBSOCKET_URL = "ws://10.112.53.217:8188";
+    private const string WEBSOCKET_URL = ConfigManager.WEBSOCKET_URL;
 
     private const bool DEBUG_WEBSOCKET_MSG = false;
 

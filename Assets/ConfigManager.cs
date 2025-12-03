@@ -3,10 +3,10 @@ using UnityEngine;
 public static class ConfigManager
 {
     // set false to get rid of all the debug information on the screen
-    public const bool DEBUG = false;
+    public const bool DEBUG = true;
 
     // mock to trigger the tracking headset movement rather than waiting for start command
-    public const bool MOCK = false;
+    public const bool MOCK = true;
 
     // only show video. for condition #1, the user will use the combo of thumbsticks and computer to control the drone
     public const bool ONLY_VIDEO = false;
@@ -22,7 +22,10 @@ public static class ConfigManager
     // true -> in coroutine
     // false -> in `Update()` method
     public const bool SAMPLE_IN_COROUTINE = true;
-    
+
+    // websocket url provided by janus gateway
+    public const string WEBSOCKET_URL = "ws://192.168.0.100:8188";
+
     public static bool IsRunningOnOculus()
     {
         return SystemInfo.deviceModel.Contains("Quest");
